@@ -95,20 +95,29 @@ impl AccountArgs {
 #[derive(Debug, Args)]
 pub struct TransactionArgs {
     /// Public note to add a description to the transaction
-    #[arg(long, default_value = "cosmos-withdrawer", alias = "note")]
+    #[arg(
+        long,
+        env = "COSMOS_WITHDRAWER_TX_MEMO",
+        default_value = "cosmos-withdrawer",
+        alias = "note"
+    )]
     pub memo: String,
 
     /// Gas limit. Set to "auto" to calculate sufficient gas by simulating the transaction.
-    #[arg(long, default_value = "auto")]
+    #[arg(long, env = "COSMOS_WITHDRAWER_TX_GAS", default_value = "auto")]
     pub gas: GasOption,
 
     /// Adjustment factor to be multiplied against the estimate returned by the transaction simulation. If the gas limit is set manually, then this flag is ignored
-    #[arg(long, default_value = "1.25")]
+    #[arg(
+        long,
+        env = "COSMOS_WITHDRAWER_TX_GAS_ADJUSTMENT",
+        default_value = "1.25"
+    )]
     pub gas_adjustment: f64,
 
     // TODO: only one is supported for now
     /// Gas prices in decimal format to determine the transaction fee (e.g. 0.1uatom)
-    #[arg(long, value_delimiter = ',')]
+    #[arg(long, env = "COSMOS_WITHDRAWER_TX_GAS_PRICES", value_delimiter = ',')]
     pub gas_prices: Vec<FloatStrCoin>,
 
     /// The sequence number of the signing account. Used as an escape hatch for unconventional Cosmos SDK transaction simulation
