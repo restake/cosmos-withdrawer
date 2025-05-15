@@ -31,6 +31,7 @@ use crate::{
 
 pub async fn withdraw(
     rpc_url: &str,
+    account_hrp: Option<&String>,
     valoper_hrp: Option<&String>,
     account: AccountArgs,
     transaction_args: TransactionArgs,
@@ -38,7 +39,7 @@ pub async fn withdraw(
     generate_only: bool,
 ) -> eyre::Result<()> {
     let client = HttpClient::new(rpc_url)?;
-    let chain_info = get_chain_info(&client, valoper_hrp).await?;
+    let chain_info = get_chain_info(&client, account_hrp, valoper_hrp).await?;
     let gas_info = GasInfo::determine_gas(&chain_info, &transaction_args)?;
 
     info!(?chain_info, ?gas_info.denom, ?gas_info.price, "chain info");

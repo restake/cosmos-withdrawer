@@ -14,6 +14,7 @@ use cosmrs::{
     tendermint::chain::Id,
 };
 use eyre::{Context, eyre};
+use tracing::trace;
 
 use crate::cosmos_sdk_extra::{
     abci_query::{
@@ -52,6 +53,7 @@ impl fmt::Debug for ChainInfo {
 
 pub async fn get_chain_info(
     client: &HttpClient,
+    supplied_account_hrp: Option<&String>,
     supplied_valoper_hrp: Option<&String>,
 ) -> eyre::Result<ChainInfo> {
     let status = client
@@ -59,9 +61,15 @@ pub async fn get_chain_info(
         .await
         .wrap_err("failed to get chain status")?;
 
-    let prefix = execute_abci_query::<Bech32Prefix>(client, Bech32PrefixRequest {})
-        .await
-        .wrap_err("failed to query chain bech32 prefix")?;
+    let prefix = if let Some(prefix) = supplied_account_hrp {
+        prefix.clone()
+    } else {
+        trace!("querying chain bech32 prefix");
+        execute_abci_query::<Bech32Prefix>(client, Bech32PrefixRequest {})
+            .await
+            .map(|res| res.bech32_prefix)
+            .wrap_err("failed to query chain bech32 prefix")?
+    };
 
     let distribution_params =
         execute_abci_query::<QueryDistributionParams>(client, QueryParamsRequest::default())
@@ -73,9 +81,7 @@ pub async fn get_chain_info(
         .map(|params| params.withdraw_addr_enabled)
         .unwrap_or_default();
 
-    let bech32_account_prefix =
-        Hrp::parse(&prefix.bech32_prefix).wrap_err("failed to parse account prefix")?;
-
+    let bech32_account_prefix = Hrp::parse(&prefix).wrap_err("failed to parse account prefix")?;
     let bech32_valoper_prefix = Hrp::parse(
         supplied_valoper_hrp
             .cloned()
@@ -83,7 +89,7 @@ pub async fn get_chain_info(
                 // Usually chains have `valoper` suffix to normal account bech32 prefix.
                 // This assumption works quite well in the wild, but there are some chains which
                 // don't use this scheme
-                format!("{}valoper", prefix.bech32_prefix)
+                format!("{prefix}valoper")
             })
             .as_str(),
     )

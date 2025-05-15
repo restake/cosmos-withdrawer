@@ -30,6 +30,10 @@ struct Cli {
     )]
     rpc_url: String,
 
+    /// Network account address prefix. Some chains do not support querying bech32 prefix, therefore you need to supply this
+    #[arg(long, env = "COSMOS_WITHDRAWER_ACCOUNT_HRP", global = true)]
+    account_hrp: Option<String>,
+
     /// Network valoper address prefix. E.g. on Iris Hub `iaa1` is for accounts, but on valopers they have `iva1`. Defaults to `{account-bech32}valoper`.
     #[arg(long, env = "COSMOS_WITHDRAWER_VALOPER_HRP", global = true)]
     valoper_hrp: Option<String>,
@@ -119,6 +123,7 @@ async fn entrypoint() -> eyre::Result<()> {
         }) => {
             crate::cmd::setup_valoper(
                 &cli.rpc_url,
+                cli.account_hrp.as_ref(),
                 cli.valoper_hrp.as_ref(),
                 account,
                 gas,
@@ -135,6 +140,7 @@ async fn entrypoint() -> eyre::Result<()> {
         }) => {
             crate::cmd::withdraw(
                 &cli.rpc_url,
+                cli.account_hrp.as_ref(),
                 cli.valoper_hrp.as_ref(),
                 account,
                 gas,
