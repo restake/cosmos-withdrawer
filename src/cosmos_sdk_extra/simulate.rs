@@ -10,6 +10,7 @@ use cosmrs::{
 };
 use eyre::ContextCompat;
 use prost::Name;
+use tracing::trace;
 
 use crate::{
     chain::{ChainInfo, WalletKeyType},
@@ -113,7 +114,9 @@ pub async fn simulate_tx(
         denom: gas_info.denom.clone(),
     };
 
-    Ok(Fee::from_amount_and_gas(amount, gas_limit as u64))
+    let fee = Fee::from_amount_and_gas(amount, gas_limit as u64);
+    trace!(?fee, "transaction simulation result");
+    Ok(fee)
 }
 
 pub async fn simulate_tx_messages<'a, I: IntoIterator<Item = &'a CosmosJsonSerializable>>(
