@@ -86,6 +86,7 @@ pub async fn withdraw(
         if validator_address.to_bytes() == account.delegator_address.to_bytes() {
             debug!(?validator_address, delegator_address = ?account.delegator_address, "delegator is also a validator, checking for commissions");
             if let Some(commission) = get_validator_commission(&client, &validator_address).await? {
+                trace!(?commission, "validator commissions");
                 for coin in commission {
                     let amount: BigUint = coin
                         .amount
