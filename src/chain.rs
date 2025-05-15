@@ -10,7 +10,7 @@ use cosmrs::{
     },
 };
 use cosmrs::{
-    rpc::{Client, HttpClient},
+    rpc::HttpClient,
     tendermint::chain::Id,
 };
 use eyre::{Context, eyre};
@@ -22,6 +22,7 @@ use crate::cosmos_sdk_extra::{
         execute_abci_query,
     },
     injective::EthAccount,
+    rpc::get_status,
 };
 
 pub struct ChainInfo {
@@ -56,8 +57,7 @@ pub async fn get_chain_info(
     supplied_account_hrp: Option<&String>,
     supplied_valoper_hrp: Option<&String>,
 ) -> eyre::Result<ChainInfo> {
-    let status = client
-        .status()
+    let status = get_status(client)
         .await
         .wrap_err("failed to get chain status")?;
 
