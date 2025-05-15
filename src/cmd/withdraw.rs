@@ -69,9 +69,9 @@ pub async fn withdraw(
 
     trace!(?delegation_total_rewards, "available rewards");
 
-    let thresholds_by_denom: HashMap<String, u128> = thresholds
+    let thresholds_by_denom: HashMap<String, BigUint> = thresholds
         .iter()
-        .map(|coin| (coin.denom.to_string(), coin.amount))
+        .map(|coin| (coin.denom.to_string(), BigUint::from(coin.amount)))
         .collect();
 
     let mut withdraw_self_valoper: Option<String> = None;
@@ -99,9 +99,8 @@ pub async fn withdraw(
             }
         }
 
-        // TODO: if any of the thresholds match, insert them into collected_coins
         for coin in reward.reward.iter() {
-            let amount: u128 = coin
+            let amount: BigUint = coin
                 .amount
                 .parse()
                 .wrap_err("failed to parse reward coin amount")?;
@@ -114,7 +113,9 @@ pub async fn withdraw(
             if amount < *threshold {
                 debug!(
                     ?coin,
-                    amount, threshold, "not interested in reward due to threshold"
+                    ?amount,
+                    ?threshold,
+                    "not interested in reward due to threshold"
                 );
                 continue;
             }
