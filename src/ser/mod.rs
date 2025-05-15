@@ -1,17 +1,19 @@
 use std::{ops::Deref, str::FromStr};
 
-use cosmos_sdk_proto::{
-    Timestamp,
-    cosmos::{
-        authz::v1beta1::{GenericAuthorization, MsgExec, MsgGrant},
-        bank::v1beta1::MsgSend,
-        distribution::v1beta1::{
-            MsgSetWithdrawAddress, MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
+use cosmrs::{
+    Any,
+    proto::{
+        Timestamp,
+        cosmos::{
+            authz::v1beta1::{GenericAuthorization, MsgExec, MsgGrant},
+            bank::v1beta1::MsgSend,
+            distribution::v1beta1::{
+                MsgSetWithdrawAddress, MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
+            },
         },
+        prost::{EncodeError, Name},
     },
-    prost::{EncodeError, Name},
 };
-use cosmrs::Any;
 use eyre::bail;
 use serde_json::{Value, json};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339, macros::offset};

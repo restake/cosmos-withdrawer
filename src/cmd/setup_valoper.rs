@@ -1,14 +1,17 @@
-use cosmos_sdk_proto::{
-    cosmos::{
-        authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
-        bank::v1beta1::MsgSend,
-        distribution::v1beta1::{
-            MsgSetWithdrawAddress, MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
+use cosmrs::{
+    Any,
+    proto::{
+        cosmos::{
+            authz::v1beta1::{GenericAuthorization, Grant, MsgGrant},
+            bank::v1beta1::MsgSend,
+            distribution::v1beta1::{
+                MsgSetWithdrawAddress, MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
+            },
         },
+        prost::Name,
     },
-    prost::Name,
+    rpc::HttpClient,
 };
-use cosmrs::{Any, rpc::HttpClient};
 use eyre::{ContextCompat, bail, eyre};
 use tracing::{info, warn};
 

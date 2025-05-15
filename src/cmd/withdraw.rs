@@ -3,10 +3,14 @@ use std::{
     str::FromStr,
 };
 
-use cosmos_sdk_proto::cosmos::distribution::v1beta1::{
-    MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission, QueryDelegationTotalRewardsRequest,
+use cosmrs::{
+    AccountId,
+    proto::cosmos::distribution::v1beta1::{
+        MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
+        QueryDelegationTotalRewardsRequest,
+    },
+    rpc::HttpClient,
 };
-use cosmrs::{AccountId, rpc::HttpClient};
 use eyre::{Context, ContextCompat, bail};
 use num_bigint::BigUint;
 use tracing::{debug, info, trace, warn};

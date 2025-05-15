@@ -1,4 +1,4 @@
-use cosmos_sdk_proto::cosmos::auth::v1beta1::BaseAccount;
+use cosmrs::proto::cosmos::auth::v1beta1::BaseAccount;
 use prost::{Message, Name};
 
 /// Manually rolled structure for /ethermint.types.v1.EthAccount

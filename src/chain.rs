@@ -1,15 +1,13 @@
 use std::{fmt, str::FromStr};
 
 use bech32::Hrp;
-use cosmos_sdk_proto::cosmos::vesting::v1beta1::{
-    ContinuousVestingAccount, PeriodicVestingAccount,
-};
 use cosmrs::{
     AccountId,
     proto::cosmos::{
         auth::v1beta1::{BaseAccount, Bech32PrefixRequest, QueryAccountRequest},
         base::v1beta1::DecCoin,
         distribution::v1beta1::{QueryParamsRequest, QueryValidatorCommissionRequest},
+        vesting::v1beta1::{ContinuousVestingAccount, PeriodicVestingAccount},
     },
 };
 use cosmrs::{rpc::HttpClient, tendermint::chain::Id};
