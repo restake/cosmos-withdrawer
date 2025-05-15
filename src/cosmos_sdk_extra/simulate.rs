@@ -101,6 +101,8 @@ pub async fn simulate_tx_messages<'a, I: IntoIterator<Item = &'a CosmosJsonSeria
     gas_info: &GasInfo,
     msgs: I,
     memo: &str,
+    account: Option<u64>,
+    sequence: Option<u64>,
 ) -> eyre::Result<Fee> {
     let tx_body = BodyBuilder::new()
         .memo(memo)
@@ -111,5 +113,13 @@ pub async fn simulate_tx_messages<'a, I: IntoIterator<Item = &'a CosmosJsonSeria
         )
         .finish();
 
-    simulate_tx(client, chain_info, gas_info, None, tx_body).await
+    let mut sim_account = TxSimulationAccount::random();
+    if let Some(account) = account {
+        sim_account.account_number = account;
+    }
+    if let Some(sequence) = sequence {
+        sim_account.sequence_number = sequence;
+    }
+
+    simulate_tx(client, chain_info, gas_info, Some(sim_account), tx_body).await
 }

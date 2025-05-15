@@ -93,6 +93,14 @@ pub struct TransactionArgs {
     /// Gas prices in decimal format to determine the transaction fee (e.g. 0.1uatom)
     #[arg(long, value_delimiter = ',')]
     pub gas_prices: Vec<FloatStrCoin>,
+
+    /// The sequence number of the signing account. Used as an escape hatch for unconventional Cosmos SDK transaction simulation
+    #[arg(long)]
+    pub sequence: Option<u64>,
+
+    /// The account number of the signing account. Used as an escape hatch for unconventional Cosmos SDK transaction simulation
+    #[arg(long)]
+    pub account_number: Option<u64>,
 }
 
 #[derive(Clone, Debug)]
