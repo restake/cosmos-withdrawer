@@ -1,6 +1,7 @@
-use std::ops::Deref;
+use std::{ops::Deref, str::FromStr};
 
 use cosmos_sdk_proto::{
+    Timestamp,
     cosmos::{
         authz::v1beta1::{GenericAuthorization, MsgExec, MsgGrant},
         bank::v1beta1::MsgSend,
@@ -11,7 +12,9 @@ use cosmos_sdk_proto::{
     prost::{EncodeError, Name},
 };
 use cosmrs::Any;
+use eyre::bail;
 use serde_json::{Value, json};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339, macros::offset};
 
 pub trait ToCosmosJson {
     fn to_value(&self) -> Value;
@@ -215,5 +218,31 @@ impl TryFrom<MsgExecCustom> for MsgExec {
 
     fn try_from(value: MsgExecCustom) -> Result<Self, Self::Error> {
         value.to_native_msg_exec()
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct TimestampStr(Timestamp);
+
+impl FromStr for TimestampStr {
+    type Err = eyre::ErrReport;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let t = OffsetDateTime::parse(s, &Rfc3339)?;
+        let t = t.to_offset(offset!(UTC));
+        if !matches!(t.year(), 1..=9999) {
+            bail!("date is out of range")
+        }
+
+        Ok(Self(Timestamp {
+            seconds: t.unix_timestamp(),
+            nanos: t.nanosecond() as i32,
+        }))
+    }
+}
+
+impl AsRef<Timestamp> for TimestampStr {
+    fn as_ref(&self) -> &Timestamp {
+        &self.0
     }
 }

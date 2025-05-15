@@ -17,6 +17,7 @@ mod ser;
 use crate::{
     cmd::{AccountArgs, TransactionArgs},
     cosmos_sdk_extra::str_coin::StrCoin,
+    ser::TimestampStr,
 };
 
 #[derive(Debug, Parser)]
@@ -57,6 +58,10 @@ enum Subcommands {
 
         #[arg(long)]
         generate_only: bool,
+
+        /// Authz grant expiration. By default grants never expire, however some older Cosmos SDK based chains require expiration to be set.
+        #[arg(long)]
+        expiration: Option<TimestampStr>,
     },
     /// Withdraw validator rewards & commissions
     Withdraw {
@@ -120,6 +125,7 @@ async fn entrypoint() -> eyre::Result<()> {
             gas,
             method,
             generate_only,
+            expiration,
         }) => {
             crate::cmd::setup_valoper(
                 &cli.rpc_url,
@@ -128,6 +134,7 @@ async fn entrypoint() -> eyre::Result<()> {
                 account,
                 gas,
                 method,
+                expiration.as_ref(),
                 generate_only,
             )
             .await?

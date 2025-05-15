@@ -18,7 +18,7 @@ use crate::{
     cosmos_sdk_extra::{
         gas::GasInfo, simulate::simulate_tx_messages, tx::generate_unsigned_tx_json,
     },
-    ser::CosmosJsonSerializable,
+    ser::{CosmosJsonSerializable, TimestampStr},
 };
 
 pub async fn setup_valoper(
@@ -28,6 +28,7 @@ pub async fn setup_valoper(
     account: AccountArgs,
     transaction_args: TransactionArgs,
     method: SetupValoperMethod,
+    expiration: Option<&TimestampStr>,
     generate_only: bool,
 ) -> eyre::Result<()> {
     let client = HttpClient::new(rpc_url)?;
@@ -92,7 +93,7 @@ pub async fn setup_valoper(
                     authorization: Some(Any::from_msg(&GenericAuthorization {
                         msg: MsgWithdrawDelegatorReward::type_url(),
                     })?),
-                    expiration: None,
+                    expiration: expiration.map(|e| *e.as_ref()),
                 }),
             };
             let msg_authz_withdraw_commission = MsgGrant {
@@ -102,7 +103,7 @@ pub async fn setup_valoper(
                     authorization: Some(Any::from_msg(&GenericAuthorization {
                         msg: MsgWithdrawValidatorCommission::type_url(),
                     })?),
-                    expiration: None,
+                    expiration: expiration.map(|e| *e.as_ref()),
                 }),
             };
 

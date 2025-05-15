@@ -22,3 +22,4 @@ base64 = "0.22.1"
 zeroize = { version = "1.8.1", features = ["aarch64", "simd", "std"] }
 prost = { version = "0.13.5", features = ["prost-derive"] }
 num-bigint = "0.4.6"
+time = "0.3.41"
