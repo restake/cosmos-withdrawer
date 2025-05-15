@@ -1,6 +1,9 @@
 use std::{fmt, str::FromStr};
 
 use bech32::Hrp;
+use cosmos_sdk_proto::cosmos::vesting::v1beta1::{
+    ContinuousVestingAccount, PeriodicVestingAccount,
+};
 use cosmrs::{
     AccountId,
     proto::cosmos::{
@@ -10,7 +13,7 @@ use cosmrs::{
     },
 };
 use cosmrs::{rpc::HttpClient, tendermint::chain::Id};
-use eyre::{Context, eyre};
+use eyre::{Context, ContextCompat, eyre};
 use tracing::trace;
 
 use crate::cosmos_sdk_extra::{
@@ -123,6 +126,28 @@ pub async fn get_account_info(
         "/cosmos.auth.v1beta1.BaseAccount" => {
             let account: BaseAccount = account.to_msg()?;
             Ok(Some(account))
+        }
+        /* ContinuousVestingAccount::type_url() */
+        "/cosmos.vesting.v1beta1.ContinuousVestingAccount" => {
+            let account: ContinuousVestingAccount = account.to_msg()?;
+            let base_account = account
+                .base_vesting_account
+                .wrap_err("Continuous does not have BaseVestingAccount data")?
+                .base_account
+                .wrap_err("BaseVestingAccount does not have BaseAccount data")?;
+
+            Ok(Some(base_account))
+        }
+        /* PeriodicVestingAccount::type_url() */
+        "/cosmos.vesting.v1beta1.PeriodicVestingAccount" => {
+            let account: PeriodicVestingAccount = account.to_msg()?;
+            let base_account = account
+                .base_vesting_account
+                .wrap_err("PeriodicVestingAccount does not have BaseVestingAccount data")?
+                .base_account
+                .wrap_err("BaseVestingAccount does not have BaseAccount data")?;
+
+            Ok(Some(base_account))
         }
         /* EthAccount::type_url() */
         "/ethermint.types.v1.EthAccount" => {
