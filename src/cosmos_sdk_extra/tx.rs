@@ -28,7 +28,6 @@ pub fn generate_unsigned_tx_json(
             "payer": "",
             "granter": "",
           },
-          "tip": null,
         },
         "signatures": [],
     })
