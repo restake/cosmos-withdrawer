@@ -3,18 +3,13 @@ use std::{
     str::FromStr,
 };
 
-use cosmos_sdk_proto::cosmos::{
-    bank::v1beta1::MsgSend,
-    base::v1beta1::Coin,
-    distribution::v1beta1::{
-        MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
-        QueryDelegationTotalRewardsRequest,
-    },
+use cosmos_sdk_proto::cosmos::distribution::v1beta1::{
+    MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission, QueryDelegationTotalRewardsRequest,
 };
 use cosmrs::{AccountId, rpc::HttpClient};
 use eyre::{Context, ContextCompat, bail};
 use num_bigint::BigUint;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
 use crate::{
     AccountArgs, TransactionArgs,
@@ -138,12 +133,9 @@ pub async fn withdraw(
         "withdrawing"
     );
 
-    // TODO: query grants
-    // If there's a grant for MsgSend, then use that.
-
-    let mut msgs: Vec<CosmosJsonSerializable> = Vec::new();
+    let mut authz_msgs: Vec<CosmosJsonSerializable> = Vec::new();
     for validator_address in withdraw_validators {
-        msgs.push(
+        authz_msgs.push(
             MsgWithdrawDelegatorReward {
                 delegator_address: account.delegator_address.to_string(),
                 validator_address,
@@ -153,41 +145,48 @@ pub async fn withdraw(
     }
 
     if let Some(validator_address) = withdraw_self_valoper {
-        msgs.push(MsgWithdrawValidatorCommission { validator_address }.into());
+        authz_msgs.push(MsgWithdrawValidatorCommission { validator_address }.into());
     }
 
-    let use_msg_send = false;
-    if use_msg_send {
-        let withdraw_address = account
-            .reward_address
-            .as_ref()
-            .unwrap_or(&account.controller_address);
+    // if !chain_info.chain_supports_setting_withdrawal_address {
+    //     let withdraw_address = account
+    //         .reward_address
+    //         .as_ref()
+    //         .unwrap_or(&account.controller_address);
 
-        let amount = collected_coins
-            .into_iter()
-            .map(|(denom, amount)| Coin {
-                amount: amount.to_string(),
-                denom,
-            })
-            .collect::<Vec<_>>();
+    //     let amount = collected_coins
+    //         .into_iter()
+    //         .map(|(denom, amount)| Coin {
+    //             amount: amount.to_string(),
+    //             denom,
+    //         })
+    //         .collect::<Vec<_>>();
 
-        msgs.push(
-            MsgSend {
-                from_address: account.delegator_address.to_string(),
-                to_address: withdraw_address.to_string(),
-                amount,
-            }
-            .into(),
+    //     authz_msgs.push(
+    //         MsgSend {
+    //             from_address: account.delegator_address.to_string(),
+    //             to_address: withdraw_address.to_string(),
+    //             amount,
+    //         }
+    //         .into(),
+    //     );
+    // }
+    if !chain_info.chain_supports_setting_withdrawal_address && generate_only {
+        // Due to the way how cosmos transactions work, you cannot stack multiple messages on top of each other - MsgSend won't know about updated balance before
+        // the transaction has been committed on the chain. If transaction is executed within the tool, then we can easily wait until withdraw succeeds, and then
+        // construct a new transaction.
+        warn!(
+            "as this chain requires using MsgSend for withdrawing rewards, and --generate-only was requested, you need to construct authz transaction yourself"
         );
-    } else {
-        msgs = vec![
-            MsgExecCustom {
-                grantee: account.controller_address.to_string(),
-                msgs,
-            }
-            .into(),
-        ];
     }
+
+    let msgs = vec![
+        MsgExecCustom {
+            grantee: account.controller_address.to_string(),
+            msgs: authz_msgs,
+        }
+        .into(),
+    ];
 
     let fee = if let Some(fee) = gas_info.get_fee() {
         fee
@@ -211,7 +210,7 @@ pub async fn withdraw(
     if generate_only {
         println!(
             "{}",
-            generate_unsigned_tx_json(msgs, &transaction_args.memo, fee.gas_limit, fee.amount,)
+            generate_unsigned_tx_json(msgs, &transaction_args.memo, fee.gas_limit, fee.amount)
         );
 
         return Ok(());

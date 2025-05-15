@@ -112,6 +112,7 @@ pub async fn setup_valoper(
             msgs.push(msg_authz_withdraw_commission.into());
         }
         SetupValoperMethod::AuthzSend => {
+            warn!("authz-send method does not work with --generate-only");
             let msg_authz_withdraw_reward = MsgGrant {
                 granter: account.delegator_address.to_string(),
                 grantee: account.controller_address.to_string(),
