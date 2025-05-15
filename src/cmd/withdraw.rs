@@ -197,8 +197,12 @@ pub async fn withdraw(
             &gas_info,
             &msgs,
             &transaction_args.memo,
-            transaction_args.account_number,
-            transaction_args.sequence,
+            transaction_args
+                .account_number
+                .or(Some(controller_account.account_number)),
+            transaction_args
+                .sequence
+                .or(Some(controller_account.sequence)),
         )
         .await?
     };

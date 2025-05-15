@@ -157,8 +157,12 @@ pub async fn setup_valoper(
             &gas_info,
             &msgs,
             &transaction_args.memo,
-            transaction_args.account_number,
-            transaction_args.sequence,
+            transaction_args
+                .account_number
+                .or(Some(delegator_account.account_number)),
+            transaction_args
+                .sequence
+                .or(Some(delegator_account.sequence)),
         )
         .await?
     };
