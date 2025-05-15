@@ -160,6 +160,7 @@ pub async fn setup_valoper(
             &gas_info,
             &msgs,
             &transaction_args.memo,
+            account.delegator_address_type,
             transaction_args
                 .account_number
                 .or(Some(delegator_account.account_number)),
@@ -173,7 +174,7 @@ pub async fn setup_valoper(
     if generate_only {
         println!(
             "{}",
-            generate_unsigned_tx_json(msgs, &transaction_args.memo, fee.gas_limit, fee.amount,)
+            generate_unsigned_tx_json(msgs, &transaction_args.memo, fee.gas_limit, fee.amount)
         );
 
         return Ok(());

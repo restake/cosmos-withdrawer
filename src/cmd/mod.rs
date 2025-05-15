@@ -8,6 +8,7 @@ use eyre::eyre;
 mod setup_valoper;
 mod withdraw;
 
+use crate::chain::WalletKeyType;
 use crate::{chain::ChainInfo, cosmos_sdk_extra::str_coin::FloatStrCoin};
 
 pub use self::setup_valoper::setup_valoper;
@@ -19,9 +20,25 @@ pub struct AccountArgs {
     #[arg(long, env = "COSMOS_WITHDRAWER_DELEGATOR_ADDRESS")]
     delegator_address: AccountId,
 
+    /// Delegator address key type. Supported values are secp256k1, and eth_secp256k1
+    #[arg(
+        long,
+        env = "COSMOS_WITHDRAWER_DELEGATOR_ADDRESS_TYPE",
+        default_value = "secp256k1"
+    )]
+    delegator_address_type: WalletKeyType,
+
     /// Controller address, as in account which will execute transactions for withdrawal and sending
     #[arg(long, env = "COSMOS_WITHDRAWER_CONTROLLER_ADDRESS")]
     controller_address: AccountId,
+
+    /// Controller address key type. Supported values are secp256k1, and eth_secp256k1
+    #[arg(
+        long,
+        env = "COSMOS_WITHDRAWER_CONTROLLER_ADDRESS_TYPE",
+        default_value = "secp256k1"
+    )]
+    controller_address_type: WalletKeyType,
 
     /// Reward address, as in account which will get the rewards. Optional - uses controller address if not set.
     #[arg(long, env = "COSMOS_WITHDRAWER_REWARD_ADDRESS")]

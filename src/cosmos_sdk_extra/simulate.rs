@@ -1,25 +1,28 @@
 use cosmrs::{
-    Coin,
+    Any, Coin,
     crypto::secp256k1::SigningKey,
     proto::{
         cosmos::tx::v1beta1::{SimulateRequest, SimulateResponse, Tx},
         prost::Message,
     },
     rpc::HttpClient,
-    tx::{Body, BodyBuilder, Fee, SignDoc, SignerInfo},
+    tx::{Body, BodyBuilder, Fee, ModeInfo, SignDoc, SignMode, SignerInfo, SignerPublicKey},
 };
 use eyre::ContextCompat;
+use prost::Name;
 
 use crate::{
-    chain::ChainInfo,
+    chain::{ChainInfo, WalletKeyType},
     cosmos_sdk_extra::{
         abci_query::{Simulate, execute_abci_query},
+        ethermint::EthPubKey,
         gas::GasInfo,
     },
     ser::CosmosJsonSerializable,
 };
 
 pub struct TxSimulationAccount {
+    pub key_type: WalletKeyType,
     pub signing_key: SigningKey,
     pub account_number: u64,
     pub sequence_number: u64,
@@ -28,6 +31,7 @@ pub struct TxSimulationAccount {
 impl TxSimulationAccount {
     pub fn random() -> Self {
         Self {
+            key_type: WalletKeyType::default(),
             signing_key: SigningKey::random(),
             account_number: 0,
             sequence_number: 0,
@@ -44,6 +48,7 @@ pub async fn simulate_tx(
 ) -> eyre::Result<Fee> {
     let (auth_info, signatures) = {
         let TxSimulationAccount {
+            key_type,
             signing_key,
             account_number,
             sequence_number,
@@ -54,8 +59,24 @@ pub async fn simulate_tx(
             amount: 1,
         };
 
-        let signer_info =
-            SignerInfo::single_direct(Some(signing_key.public_key()), sequence_number);
+        let public_key: SignerPublicKey = match key_type {
+            WalletKeyType::Secp256k1 => signing_key.public_key().into(),
+            // Same bytes, but different type_url
+            WalletKeyType::EthermintSecp256k1 => SignerPublicKey::Any(Any {
+                type_url: EthPubKey::type_url(),
+                value: EthPubKey {
+                    key: signing_key.public_key().to_bytes(),
+                }
+                .encode_to_vec(),
+            }),
+        };
+
+        let signer_info = SignerInfo {
+            public_key: Some(public_key),
+            mode_info: ModeInfo::single(SignMode::Direct),
+            sequence: sequence_number,
+        };
+
         let auth_info = signer_info.auth_info(Fee::from_amount_and_gas(amount, 1_u64));
         let sign_doc = SignDoc::new(&body, &auth_info, &chain_info.id, account_number)?;
 
@@ -101,6 +122,7 @@ pub async fn simulate_tx_messages<'a, I: IntoIterator<Item = &'a CosmosJsonSeria
     gas_info: &GasInfo,
     msgs: I,
     memo: &str,
+    key_type: WalletKeyType,
     account: Option<u64>,
     sequence: Option<u64>,
 ) -> eyre::Result<Fee> {
@@ -114,6 +136,7 @@ pub async fn simulate_tx_messages<'a, I: IntoIterator<Item = &'a CosmosJsonSeria
         .finish();
 
     let mut sim_account = TxSimulationAccount::random();
+    sim_account.key_type = key_type;
     if let Some(account) = account {
         sim_account.account_number = account;
     }

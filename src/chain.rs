@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, str::FromStr};
 
 use bech32::Hrp;
 use cosmrs::{
@@ -9,10 +9,7 @@ use cosmrs::{
         distribution::v1beta1::{QueryParamsRequest, QueryValidatorCommissionRequest},
     },
 };
-use cosmrs::{
-    rpc::HttpClient,
-    tendermint::chain::Id,
-};
+use cosmrs::{rpc::HttpClient, tendermint::chain::Id};
 use eyre::{Context, eyre};
 use tracing::trace;
 
@@ -21,7 +18,8 @@ use crate::cosmos_sdk_extra::{
         Bech32Prefix, QueryAccount, QueryDistributionParams, QueryValidatorCommission,
         execute_abci_query,
     },
-    injective::EthAccount,
+    ethermint::EthAccount,
+    injective::EthAccount as InjectiveEthAccount,
     rpc::get_status,
 };
 
@@ -127,8 +125,13 @@ pub async fn get_account_info(
             Ok(Some(account))
         }
         /* EthAccount::type_url() */
-        "/injective.types.v1beta1.EthAccount" => {
+        "/ethermint.types.v1.EthAccount" => {
             let account: EthAccount = account.to_msg()?;
+            Ok(Some(account.base_account))
+        }
+        /* InjectiveEthAccount::type_url() */
+        "/injective.types.v1beta1.EthAccount" => {
+            let account: InjectiveEthAccount = account.to_msg()?;
             Ok(Some(account.base_account))
         }
         type_url => Err(eyre!("unsupported account type '{type_url}'")),
@@ -151,4 +154,25 @@ pub async fn get_validator_commission(
     Ok(commission
         .commission
         .map(|commission| commission.commission))
+}
+
+#[derive(Clone, Debug, Default)]
+pub enum WalletKeyType {
+    /// Standard Cosmos SDK secp256k1 key
+    #[default]
+    Secp256k1,
+    /// eth_secp256k1, used by Ethermint/Evmos/etc.
+    EthermintSecp256k1,
+}
+
+impl FromStr for WalletKeyType {
+    type Err = eyre::ErrReport;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "secp256k1" => Ok(Self::Secp256k1),
+            "eth_secp256k1" => Ok(Self::EthermintSecp256k1),
+            s => Err(eyre!("Unsupported wallet key type '{s}'")),
+        }
+    }
 }

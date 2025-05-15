@@ -197,6 +197,7 @@ pub async fn withdraw(
             &gas_info,
             &msgs,
             &transaction_args.memo,
+            account.controller_address_type,
             transaction_args
                 .account_number
                 .or(Some(controller_account.account_number)),
