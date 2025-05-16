@@ -1,4 +1,4 @@
-use std::{fmt, str::FromStr};
+use std::fmt;
 
 use bech32::Hrp;
 use cosmrs::{
@@ -24,11 +24,59 @@ use crate::cosmos_sdk_extra::{
     rpc::get_status,
 };
 
+pub struct Bech32Prefixes {
+    pub account_prefix: Hrp,
+    pub valoper_prefix: Hrp,
+}
+
+impl fmt::Debug for Bech32Prefixes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Bech32Prefixes")
+            .field("account_prefix", &self.account_prefix.as_str())
+            .field("valoper_prefix", &self.valoper_prefix.as_str())
+            .finish()
+    }
+}
+
+pub async fn get_chain_bech32_prefixes(
+    client: &HttpClient,
+    supplied_account_hrp: Option<&String>,
+    supplied_valoper_hrp: Option<&String>,
+) -> eyre::Result<Bech32Prefixes> {
+    let prefix = if let Some(prefix) = supplied_account_hrp {
+        prefix.clone()
+    } else {
+        trace!("querying chain bech32 prefix");
+        execute_abci_query::<Bech32Prefix>(client, Bech32PrefixRequest {})
+            .await
+            .map(|res| res.bech32_prefix)
+            .wrap_err("failed to query chain bech32 prefix")?
+    };
+
+    let account_prefix = Hrp::parse(&prefix).wrap_err("failed to parse account prefix")?;
+    let valoper_prefix = Hrp::parse(
+        supplied_valoper_hrp
+            .cloned()
+            .unwrap_or_else(|| {
+                // Usually chains have `valoper` suffix to normal account bech32 prefix.
+                // This assumption works quite well in the wild, but there are some chains which
+                // don't use this scheme
+                format!("{prefix}valoper")
+            })
+            .as_str(),
+    )
+    .wrap_err("failed to parse valoper prefix")?;
+
+    Ok(Bech32Prefixes {
+        account_prefix,
+        valoper_prefix,
+    })
+}
+
 pub struct ChainInfo {
     pub id: Id,
     pub chain_supports_setting_withdrawal_address: bool,
-    pub bech32_account_prefix: Hrp,
-    pub bech32_valoper_prefix: Hrp,
+    pub bech32: Bech32Prefixes,
 }
 
 impl fmt::Debug for ChainInfo {
@@ -39,14 +87,7 @@ impl fmt::Debug for ChainInfo {
                 "chain_supports_setting_withdrawal_address",
                 &self.chain_supports_setting_withdrawal_address,
             )
-            .field(
-                "bech32_account_prefix",
-                &self.bech32_account_prefix.as_str(),
-            )
-            .field(
-                "bech32_valoper_prefix",
-                &self.bech32_valoper_prefix.as_str(),
-            )
+            .field("bech32", &self.bech32)
             .finish()
     }
 }
@@ -60,16 +101,6 @@ pub async fn get_chain_info(
         .await
         .wrap_err("failed to get chain status")?;
 
-    let prefix = if let Some(prefix) = supplied_account_hrp {
-        prefix.clone()
-    } else {
-        trace!("querying chain bech32 prefix");
-        execute_abci_query::<Bech32Prefix>(client, Bech32PrefixRequest {})
-            .await
-            .map(|res| res.bech32_prefix)
-            .wrap_err("failed to query chain bech32 prefix")?
-    };
-
     let distribution_params =
         execute_abci_query::<QueryDistributionParams>(client, QueryParamsRequest::default())
             .await
@@ -80,25 +111,13 @@ pub async fn get_chain_info(
         .map(|params| params.withdraw_addr_enabled)
         .unwrap_or_default();
 
-    let bech32_account_prefix = Hrp::parse(&prefix).wrap_err("failed to parse account prefix")?;
-    let bech32_valoper_prefix = Hrp::parse(
-        supplied_valoper_hrp
-            .cloned()
-            .unwrap_or_else(|| {
-                // Usually chains have `valoper` suffix to normal account bech32 prefix.
-                // This assumption works quite well in the wild, but there are some chains which
-                // don't use this scheme
-                format!("{prefix}valoper")
-            })
-            .as_str(),
-    )
-    .wrap_err("failed to parse valoper prefix")?;
+    let bech32 =
+        get_chain_bech32_prefixes(client, supplied_account_hrp, supplied_valoper_hrp).await?;
 
     Ok(ChainInfo {
         id: status.node_info.network,
         chain_supports_setting_withdrawal_address,
-        bech32_account_prefix,
-        bech32_valoper_prefix,
+        bech32,
     })
 }
 
@@ -177,25 +196,4 @@ pub async fn get_validator_commission(
     Ok(commission
         .commission
         .map(|commission| commission.commission))
-}
-
-#[derive(Clone, Debug, Default)]
-pub enum WalletKeyType {
-    /// Standard Cosmos SDK secp256k1 key
-    #[default]
-    Secp256k1,
-    /// eth_secp256k1, used by Ethermint/Evmos/etc.
-    EthermintSecp256k1,
-}
-
-impl FromStr for WalletKeyType {
-    type Err = eyre::ErrReport;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "secp256k1" => Ok(Self::Secp256k1),
-            "eth_secp256k1" => Ok(Self::EthermintSecp256k1),
-            s => Err(eyre!("Unsupported wallet key type '{s}'")),
-        }
-    }
 }

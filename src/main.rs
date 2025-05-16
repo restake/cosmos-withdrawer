@@ -13,9 +13,10 @@ mod chain_registry;
 mod cmd;
 mod cosmos_sdk_extra;
 mod ser;
+mod wallet;
 
 use crate::{
-    cmd::{AccountArgs, TransactionArgs},
+    cmd::{AccountArgs, DebugSubcommand, SetupValoperMethod, TransactionArgs},
     cosmos_sdk_extra::str_coin::StrCoin,
     ser::TimestampStr,
 };
@@ -76,19 +77,12 @@ enum Subcommands {
         )]
         thresholds: Vec<StrCoin>,
     },
-}
-
-#[derive(Debug, Default, Subcommand)]
-enum SetupValoperMethod {
-    #[default]
-    /// Determine valoper setup method based on available chain functionality
-    Auto,
-
-    /// Use authz and set withdraw address
-    AuthzWithdraw,
-
-    /// Use authz and grant sending tokens
-    AuthzSend,
+    /// Debug subcommands
+    Debug {
+        /// Debug subcommand
+        #[command(subcommand)]
+        debug: DebugSubcommand,
+    },
 }
 
 #[tokio::main]
@@ -143,6 +137,15 @@ async fn entrypoint() -> eyre::Result<()> {
                 account,
                 transaction_args,
                 thresholds,
+            )
+            .await?
+        }
+        Some(Subcommands::Debug { debug }) => {
+            crate::cmd::debug(
+                &cli.rpc_url,
+                cli.account_hrp.as_ref(),
+                cli.valoper_hrp.as_ref(),
+                debug,
             )
             .await?
         }

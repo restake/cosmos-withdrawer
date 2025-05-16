@@ -7,21 +7,22 @@ use cosmrs::{
             distribution::v1beta1::{
                 MsgSetWithdrawAddress, MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
             },
+            tx::v1beta1::Tx,
         },
         prost::Name,
     },
-    rpc::HttpClient,
+    rpc::{Client, HttpClient},
+    tx::MessageExt,
 };
-use eyre::{ContextCompat, bail, eyre};
-use tracing::{info, warn};
+use eyre::{Context, ContextCompat, eyre};
+use tracing::{info, trace, warn};
 
 use crate::{
     AccountArgs, SetupValoperMethod, TransactionArgs,
     chain::{get_account_info, get_chain_info},
-    cosmos_sdk_extra::{
-        gas::GasInfo, simulate::simulate_tx_messages, tx::generate_unsigned_tx_json,
-    },
+    cosmos_sdk_extra::{gas::GasInfo, simulate::simulate_tx, tx::generate_unsigned_tx_json},
     ser::{CosmosJsonSerializable, TimestampStr},
+    wallet::{SigningAccountType, construct_transaction_body, setup_signer, sign_transaction},
 };
 
 pub async fn setup_valoper(
@@ -70,9 +71,13 @@ pub async fn setup_valoper(
         .await?
         .wrap_err("delegator account is not initialized")?;
 
+    trace!(?delegator_account, "delegator account info");
+
     let controller_account = get_account_info(&client, &account.controller_address)
         .await?
         .wrap_err("controller account is not initialized")?;
+
+    trace!(?controller_account, "controller account info");
 
     let mut msgs: Vec<CosmosJsonSerializable> = Vec::new();
     info!(?setup_method, "setting up valoper account grants");
@@ -153,22 +158,31 @@ pub async fn setup_valoper(
         _ => unreachable!(),
     }
 
+    // This transaction will be signed by the delegator account
+    let signer = setup_signer(
+        &account,
+        &chain_info.bech32,
+        SigningAccountType::Delegator {
+            account_number: transaction_args
+                .account_number
+                .unwrap_or(delegator_account.account_number),
+            sequence: transaction_args
+                .sequence
+                .unwrap_or(delegator_account.sequence),
+        },
+        transaction_args.generate_only,
+    )?;
+
+    // Determine necessary fee for transaction execution
     let fee = if let Some(fee) = gas_info.get_fee() {
         fee
     } else {
-        simulate_tx_messages(
+        simulate_tx(
             &client,
             &chain_info,
             &gas_info,
-            &msgs,
-            &transaction_args.memo,
-            account.delegator_address_type,
-            transaction_args
-                .account_number
-                .or(Some(delegator_account.account_number)),
-            transaction_args
-                .sequence
-                .or(Some(delegator_account.sequence)),
+            &signer,
+            construct_transaction_body(&transaction_args.memo, &msgs)?,
         )
         .await?
     };
@@ -182,8 +196,24 @@ pub async fn setup_valoper(
         return Ok(());
     }
 
-    let _ = delegator_account;
-    let _ = controller_account;
+    let signed_tx = sign_transaction(
+        &chain_info,
+        &signer,
+        fee,
+        construct_transaction_body(&transaction_args.memo, &msgs)?,
+    )
+    .wrap_err("failed to sign withdraw transaction")?;
 
-    bail!("transaction signing & broadcasting is not implemented yet")
+    if transaction_args.dry_run {
+        info!("dry run was requested, nothing was done");
+        return Ok(());
+    }
+
+    let tx_result = client
+        .broadcast_tx_sync(Tx::from(signed_tx).to_bytes()?)
+        .await?;
+
+    dbg!(tx_result);
+
+    Ok(())
 }

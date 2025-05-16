@@ -17,3 +17,4 @@ serde = { version = "1.0.219", features = ["derive"] }
 prost = { version = "0.13.5", features = ["prost-derive"] }
 num-bigint = "0.4.6"
 time = "0.3.41"
+bip32 = { version = "0.5.3", features = ["mnemonic", "bip39"] }

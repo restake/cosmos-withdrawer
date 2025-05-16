@@ -5,13 +5,17 @@ use std::{
 
 use cosmrs::{
     AccountId,
-    proto::cosmos::distribution::v1beta1::{
-        MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
-        QueryDelegationTotalRewardsRequest,
+    proto::cosmos::{
+        distribution::v1beta1::{
+            MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
+            QueryDelegationTotalRewardsRequest,
+        },
+        tx::v1beta1::Tx,
     },
-    rpc::HttpClient,
+    rpc::{Client, HttpClient},
+    tx::MessageExt,
 };
-use eyre::{Context, ContextCompat, bail};
+use eyre::{Context, ContextCompat};
 use num_bigint::BigUint;
 use tracing::{debug, info, trace, warn};
 
@@ -21,11 +25,12 @@ use crate::{
     cosmos_sdk_extra::{
         abci_query::{QueryDelegationTotalRewards, execute_abci_query},
         gas::GasInfo,
-        simulate::simulate_tx_messages,
+        simulate::simulate_tx,
         str_coin::StrCoin,
         tx::generate_unsigned_tx_json,
     },
     ser::{CosmosJsonSerializable, MsgExecCustom},
+    wallet::{SigningAccountType, construct_transaction_body, setup_signer, sign_transaction},
 };
 
 pub async fn withdraw(
@@ -191,22 +196,30 @@ pub async fn withdraw(
         .into(),
     ];
 
+    // This transaction will be signed by the controller account
+    let signer = setup_signer(
+        &account,
+        &chain_info.bech32,
+        SigningAccountType::Controller {
+            account_number: transaction_args
+                .account_number
+                .unwrap_or(controller_account.account_number),
+            sequence: transaction_args
+                .sequence
+                .unwrap_or(controller_account.sequence),
+        },
+        transaction_args.generate_only,
+    )?;
+
     let fee = if let Some(fee) = gas_info.get_fee() {
         fee
     } else {
-        simulate_tx_messages(
+        simulate_tx(
             &client,
             &chain_info,
             &gas_info,
-            &msgs,
-            &transaction_args.memo,
-            account.controller_address_type,
-            transaction_args
-                .account_number
-                .or(Some(controller_account.account_number)),
-            transaction_args
-                .sequence
-                .or(Some(controller_account.sequence)),
+            &signer,
+            construct_transaction_body(&transaction_args.memo, &msgs)?,
         )
         .await?
     };
@@ -220,8 +233,24 @@ pub async fn withdraw(
         return Ok(());
     }
 
-    let _ = delegator_account;
-    let _ = controller_account;
+    let signed_tx = sign_transaction(
+        &chain_info,
+        &signer,
+        fee,
+        construct_transaction_body(&transaction_args.memo, &msgs)?,
+    )
+    .wrap_err("failed to sign withdraw transaction")?;
 
-    bail!("transaction signing & broadcasting is not implemented yet")
+    if transaction_args.dry_run {
+        info!("dry run was requested, nothing was done");
+        return Ok(());
+    }
+
+    let tx_result = client
+        .broadcast_tx_sync(Tx::from(signed_tx).to_bytes()?)
+        .await?;
+
+    dbg!(tx_result);
+
+    Ok(())
 }
