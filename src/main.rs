@@ -51,13 +51,10 @@ enum Subcommands {
         account: AccountArgs,
 
         #[clap(flatten)]
-        gas: TransactionArgs,
+        transaction_args: TransactionArgs,
 
         #[command(subcommand)]
         method: SetupValoperMethod,
-
-        #[arg(long)]
-        generate_only: bool,
 
         /// Authz grant expiration. By default grants never expire, however some older Cosmos SDK based chains require expiration to be set.
         #[arg(long)]
@@ -69,7 +66,7 @@ enum Subcommands {
         account: AccountArgs,
 
         #[clap(flatten)]
-        gas: TransactionArgs,
+        transaction_args: TransactionArgs,
 
         /// Token thresholds for withdrawal. Format: 1234denom
         #[clap(
@@ -78,9 +75,6 @@ enum Subcommands {
             value_delimiter = ','
         )]
         thresholds: Vec<StrCoin>,
-
-        #[arg(long)]
-        generate_only: bool,
     },
 }
 
@@ -122,9 +116,8 @@ async fn entrypoint() -> eyre::Result<()> {
     match cli.command {
         Some(Subcommands::SetupValoper {
             account,
-            gas,
+            transaction_args,
             method,
-            generate_only,
             expiration,
         }) => {
             crate::cmd::setup_valoper(
@@ -132,27 +125,24 @@ async fn entrypoint() -> eyre::Result<()> {
                 cli.account_hrp.as_ref(),
                 cli.valoper_hrp.as_ref(),
                 account,
-                gas,
+                transaction_args,
                 method,
                 expiration.as_ref(),
-                generate_only,
             )
             .await?
         }
         Some(Subcommands::Withdraw {
             account,
-            gas,
+            transaction_args,
             thresholds,
-            generate_only,
         }) => {
             crate::cmd::withdraw(
                 &cli.rpc_url,
                 cli.account_hrp.as_ref(),
                 cli.valoper_hrp.as_ref(),
                 account,
-                gas,
+                transaction_args,
                 thresholds,
-                generate_only,
             )
             .await?
         }

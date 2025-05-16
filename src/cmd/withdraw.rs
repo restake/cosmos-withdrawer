@@ -35,7 +35,6 @@ pub async fn withdraw(
     account: AccountArgs,
     transaction_args: TransactionArgs,
     thresholds: Vec<StrCoin>,
-    generate_only: bool,
 ) -> eyre::Result<()> {
     let client = HttpClient::new(rpc_url)?;
     let chain_info = get_chain_info(&client, account_hrp, valoper_hrp).await?;
@@ -175,7 +174,7 @@ pub async fn withdraw(
     //         .into(),
     //     );
     // }
-    if !chain_info.chain_supports_setting_withdrawal_address && generate_only {
+    if !chain_info.chain_supports_setting_withdrawal_address && transaction_args.generate_only {
         // Due to the way how cosmos transactions work, you cannot stack multiple messages on top of each other - MsgSend won't know about updated balance before
         // the transaction has been committed on the chain. If transaction is executed within the tool, then we can easily wait until withdraw succeeds, and then
         // construct a new transaction.
@@ -212,7 +211,7 @@ pub async fn withdraw(
         .await?
     };
 
-    if generate_only {
+    if transaction_args.generate_only {
         println!(
             "{}",
             generate_unsigned_tx_json(msgs, &transaction_args.memo, fee.gas_limit, fee.amount)

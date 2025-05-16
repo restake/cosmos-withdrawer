@@ -119,6 +119,7 @@ pub async fn simulate_tx(
     Ok(fee)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn simulate_tx_messages<'a, I: IntoIterator<Item = &'a CosmosJsonSerializable>>(
     client: &HttpClient,
     chain_info: &ChainInfo,

@@ -32,7 +32,6 @@ pub async fn setup_valoper(
     transaction_args: TransactionArgs,
     method: SetupValoperMethod,
     expiration: Option<&TimestampStr>,
-    generate_only: bool,
 ) -> eyre::Result<()> {
     let client = HttpClient::new(rpc_url)?;
     let chain_info = get_chain_info(&client, account_hrp, valoper_hrp).await?;
@@ -174,7 +173,7 @@ pub async fn setup_valoper(
         .await?
     };
 
-    if generate_only {
+    if transaction_args.generate_only {
         println!(
             "{}",
             generate_unsigned_tx_json(msgs, &transaction_args.memo, fee.gas_limit, fee.amount)

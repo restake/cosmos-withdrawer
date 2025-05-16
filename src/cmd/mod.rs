@@ -116,7 +116,7 @@ pub struct TransactionArgs {
     pub gas_adjustment: f64,
 
     // TODO: only one is supported for now
-    /// Gas prices in decimal format to determine the transaction fee (e.g. 0.1uatom)
+    /// Gas prices in decimal format to determine the transaction fee (e.g. 0.1uatom). Note that you can supply only one gas price at this time
     #[arg(long, env = "COSMOS_WITHDRAWER_TX_GAS_PRICES", value_delimiter = ',')]
     pub gas_prices: Vec<FloatStrCoin>,
 
@@ -127,6 +127,10 @@ pub struct TransactionArgs {
     /// The account number of the signing account. Used as an escape hatch for unconventional Cosmos SDK transaction simulation
     #[arg(long)]
     pub account_number: Option<u64>,
+
+    /// Whether to only generate the transaction JSON to stdout for signing & broadcasting externally, e.g. `osmosisd tx sign ./tx_unsigned.json --from=mykey | osmosisd tx broadcast -`.
+    #[arg(long)]
+    generate_only: bool,
 }
 
 #[derive(Clone, Debug)]
