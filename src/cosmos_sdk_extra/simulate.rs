@@ -54,9 +54,9 @@ pub async fn simulate_tx(
     .await?;
 
     let sim_gas_info = sim_gas_info.wrap_err("Simulation did not contain spent gas info")?;
-    let gas_limit = ((sim_gas_info.gas_used as f64) * gas_info.adjustment).round();
+    let gas_limit = ((sim_gas_info.gas_used as f64) * gas_info.adjustment).ceil();
     let amount = Coin {
-        amount: (gas_limit * gas_info.price).round() as u128,
+        amount: (gas_limit * gas_info.price).ceil() as u128,
         denom: gas_info.denom.clone(),
     };
 

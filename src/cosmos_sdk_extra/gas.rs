@@ -52,7 +52,7 @@ impl GasInfo {
     pub fn get_fee(&self) -> Option<Fee> {
         if let Some(limit) = self.limit {
             let coin = Coin {
-                amount: ((limit as f64 * self.adjustment).round() * self.price).round() as u128,
+                amount: ((limit as f64 * self.adjustment).ceil() * self.price).ceil() as u128,
                 denom: self.denom.clone(),
             };
             Some(Fee::from_amount_and_gas(coin, limit))
