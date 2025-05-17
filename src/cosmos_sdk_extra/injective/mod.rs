@@ -18,3 +18,25 @@ impl Name for EthAccount {
         format!("{}.{}", Self::PACKAGE, Self::NAME)
     }
 }
+
+/// Manually rolled structure for /injective.crypto.v1.ethsecp256k1.PubKey
+#[derive(Message)]
+pub struct EthPubKey {
+    #[prost(bytes = "vec", tag = "1")]
+    pub key: Vec<u8>,
+}
+
+impl Name for EthPubKey {
+    const NAME: &'static str = "PubKey";
+    const PACKAGE: &'static str = "injective.crypto.v1beta1.ethsecp256k1";
+
+    fn full_name() -> String {
+        ::prost::alloc::format!("{}.{}", Self::PACKAGE, Self::NAME)
+    }
+}
+
+impl From<super::ethermint::EthPubKey> for EthPubKey {
+    fn from(value: super::ethermint::EthPubKey) -> Self {
+        Self { key: value.key }
+    }
+}

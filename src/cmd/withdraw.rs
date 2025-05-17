@@ -30,7 +30,10 @@ use crate::{
         tx::generate_unsigned_tx_json,
     },
     ser::{CosmosJsonSerializable, MsgExecCustom},
-    wallet::{SigningAccountType, construct_transaction_body, setup_signer, sign_transaction},
+    wallet::{
+        SigningAccountType, WalletKeyType, construct_transaction_body, setup_signer,
+        sign_transaction,
+    },
 };
 
 pub async fn withdraw(
@@ -55,13 +58,37 @@ pub async fn withdraw(
         .await?
         .wrap_err("delegator account is not initialized")?;
 
-    trace!(?delegator_account, "delegator account info");
+    let delegator_key_type: WalletKeyType = account
+        .delegator_address_type
+        .or(delegator_account
+            .pub_key
+            .as_ref()
+            .and_then(|pub_key| pub_key.try_into().ok()))
+        .wrap_err("unable to determine delegator account public key type")?;
+
+    trace!(
+        ?delegator_account,
+        ?delegator_key_type,
+        "delegator account info"
+    );
 
     let controller_account = get_account_info(&client, &account.controller_address)
         .await?
         .wrap_err("controller account is not initialized")?;
 
-    trace!(?controller_account, "controller account info");
+    let controller_key_type: WalletKeyType = account
+        .controller_address_type
+        .or(controller_account
+            .pub_key
+            .as_ref()
+            .and_then(|pub_key| pub_key.try_into().ok()))
+        .wrap_err("unable to determine controller account public key type")?;
+
+    trace!(
+        ?controller_account,
+        ?controller_key_type,
+        "controller account info"
+    );
 
     let delegation_total_rewards = execute_abci_query::<QueryDelegationTotalRewards>(
         &client,
@@ -201,6 +228,7 @@ pub async fn withdraw(
         &account,
         &chain_info.bech32,
         SigningAccountType::Controller {
+            key_type: controller_key_type,
             account_number: transaction_args
                 .account_number
                 .unwrap_or(controller_account.account_number),

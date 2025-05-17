@@ -34,3 +34,9 @@ impl Name for EthPubKey {
         ::prost::alloc::format!("{}.{}", Self::PACKAGE, Self::NAME)
     }
 }
+
+impl From<super::injective::EthPubKey> for EthPubKey {
+    fn from(value: super::injective::EthPubKey) -> Self {
+        Self { key: value.key }
+    }
+}

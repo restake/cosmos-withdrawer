@@ -43,13 +43,9 @@ pub struct AccountArgs {
     )]
     pub delegator_mnemonic: Option<String>,
 
-    /// Delegator address key type. Supported values are secp256k1, and eth_secp256k1
-    #[arg(
-        long,
-        env = "COSMOS_WITHDRAWER_DELEGATOR_ADDRESS_TYPE",
-        default_value = "secp256k1"
-    )]
-    pub delegator_address_type: WalletKeyType,
+    /// Delegator address key type. Supported values are secp256k1, and eth_secp256k1.  Determined from the account info on chain by default.
+    #[arg(long, env = "COSMOS_WITHDRAWER_DELEGATOR_ADDRESS_TYPE")]
+    pub delegator_address_type: Option<WalletKeyType>,
 
     /// Delegator mnemonic coin type. Defaults to 118, which is widely used by many Cosmos SDK based networks
     #[arg(
@@ -79,13 +75,9 @@ pub struct AccountArgs {
     )]
     pub controller_mnemonic_coin_type: u64,
 
-    /// Controller address key type. Supported values are secp256k1, and eth_secp256k1
-    #[arg(
-        long,
-        env = "COSMOS_WITHDRAWER_CONTROLLER_ADDRESS_TYPE",
-        default_value = "secp256k1"
-    )]
-    pub controller_address_type: WalletKeyType,
+    /// Controller address key type. Supported values are secp256k1, and eth_secp256k1. Determined from the account info on chain by default.
+    #[arg(long, env = "COSMOS_WITHDRAWER_CONTROLLER_ADDRESS_TYPE")]
+    pub controller_address_type: Option<WalletKeyType>,
 
     /// Reward address, as in account which will get the rewards. Optional - uses controller address if not set.
     #[arg(long, env = "COSMOS_WITHDRAWER_REWARD_ADDRESS")]

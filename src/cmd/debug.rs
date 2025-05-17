@@ -3,7 +3,10 @@ use clap::Subcommand;
 use cosmrs::rpc::HttpClient;
 use serde_json::json;
 
-use crate::{chain::get_chain_bech32_prefixes, wallet::derive_key};
+use crate::{
+    chain::get_chain_bech32_prefixes,
+    wallet::{TxSigner, derive_key},
+};
 
 #[derive(Clone, Debug, Subcommand)]
 pub enum DebugSubcommand {
@@ -42,7 +45,7 @@ async fn derive_address(
     coin_type: u64,
 ) -> eyre::Result<()> {
     let signing_key = derive_key(mnemonic, "", coin_type)?;
-    let public_key = signing_key.public_key();
+    let signer = TxSigner::new(signing_key, Default::default());
 
     // Ensure that we have HRPs for deriving account ids
     let (account_hrp, valoper_hrp) = match (account_hrp, valoper_hrp) {
@@ -56,8 +59,8 @@ async fn derive_address(
         }
     };
 
-    let account_id = public_key.account_id(account_hrp.as_str())?;
-    let valoper_id = public_key.account_id(valoper_hrp.as_str())?;
+    let account_id = signer.account_id(&account_hrp)?;
+    let valoper_id = signer.account_id(&valoper_hrp)?;
 
     println!(
         "{}",

@@ -11,7 +11,7 @@ use cosmrs::{
     },
 };
 use cosmrs::{rpc::HttpClient, tendermint::chain::Id};
-use eyre::{Context, ContextCompat, eyre};
+use eyre::{Context, ContextCompat, bail};
 use tracing::trace;
 
 use crate::cosmos_sdk_extra::{
@@ -138,46 +138,42 @@ pub async fn get_account_info(
         return Ok(None);
     };
 
-    match account.type_url.as_str() {
+    let base_account: BaseAccount = match account.type_url.as_str() {
         /* BaseAccount::type_url() */
-        "/cosmos.auth.v1beta1.BaseAccount" => {
-            let account: BaseAccount = account.to_msg()?;
-            Ok(Some(account))
-        }
-        /* ContinuousVestingAccount::type_url() */
-        "/cosmos.vesting.v1beta1.ContinuousVestingAccount" => {
-            let account: ContinuousVestingAccount = account.to_msg()?;
-            let base_account = account
-                .base_vesting_account
-                .wrap_err("Continuous does not have BaseVestingAccount data")?
-                .base_account
-                .wrap_err("BaseVestingAccount does not have BaseAccount data")?;
+        "/cosmos.auth.v1beta1.BaseAccount" => account.to_msg()?,
 
-            Ok(Some(base_account))
-        }
+        /* ContinuousVestingAccount::type_url() */
+        "/cosmos.vesting.v1beta1.ContinuousVestingAccount" => account
+            .to_msg::<ContinuousVestingAccount>()?
+            .base_vesting_account
+            .wrap_err("Continuous does not have BaseVestingAccount data")?
+            .base_account
+            .wrap_err("BaseVestingAccount does not have BaseAccount data")?,
+
         /* PeriodicVestingAccount::type_url() */
         "/cosmos.vesting.v1beta1.PeriodicVestingAccount" => {
             let account: PeriodicVestingAccount = account.to_msg()?;
-            let base_account = account
+            
+
+            account
                 .base_vesting_account
                 .wrap_err("PeriodicVestingAccount does not have BaseVestingAccount data")?
                 .base_account
-                .wrap_err("BaseVestingAccount does not have BaseAccount data")?;
+                .wrap_err("BaseVestingAccount does not have BaseAccount data")?
+        }
 
-            Ok(Some(base_account))
-        }
         /* EthAccount::type_url() */
-        "/ethermint.types.v1.EthAccount" => {
-            let account: EthAccount = account.to_msg()?;
-            Ok(Some(account.base_account))
-        }
+        "/ethermint.types.v1.EthAccount" => account.to_msg::<EthAccount>()?.base_account,
+
         /* InjectiveEthAccount::type_url() */
         "/injective.types.v1beta1.EthAccount" => {
-            let account: InjectiveEthAccount = account.to_msg()?;
-            Ok(Some(account.base_account))
+            account.to_msg::<InjectiveEthAccount>()?.base_account
         }
-        type_url => Err(eyre!("unsupported account type '{type_url}'")),
-    }
+
+        type_url => bail!("unsupported account type '{type_url}'"),
+    };
+
+    Ok(Some(base_account))
 }
 
 pub async fn get_validator_commission(
