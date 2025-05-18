@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::{
     chain::get_chain_bech32_prefixes,
-    wallet::{TxSigner, derive_key},
+    wallet::{TxSigner, WalletKeyType, derive_key},
 };
 
 #[derive(Clone, Debug, Subcommand)]
@@ -16,8 +16,12 @@ pub enum DebugSubcommand {
         #[clap(long, env = "MNEMONIC", hide_env_values = true)]
         mnemonic: String,
 
+        /// Wallet key type. Supported values are secp256k1, and eth_secp256k1.
+        #[clap(long, default_value = "secp256k1")]
+        key_type: WalletKeyType,
+
         /// Coin type. Defaults to 118, which is widely used by many Cosmos SDK based networks
-        #[clap(long = "coin-type", default_value = "118")]
+        #[clap(long, default_value = "118")]
         coin_type: u64,
     },
 }
@@ -31,8 +35,19 @@ pub async fn debug(
     match debug {
         DebugSubcommand::DeriveAddress {
             mnemonic,
+            key_type,
             coin_type,
-        } => derive_address(rpc_url, account_hrp, valoper_hrp, &mnemonic, coin_type).await?,
+        } => {
+            derive_address(
+                rpc_url,
+                account_hrp,
+                valoper_hrp,
+                &mnemonic,
+                key_type,
+                coin_type,
+            )
+            .await?
+        }
     }
     Ok(())
 }
@@ -42,10 +57,11 @@ async fn derive_address(
     account_hrp: Option<&String>,
     valoper_hrp: Option<&String>,
     mnemonic: &str,
+    key_type: WalletKeyType,
     coin_type: u64,
 ) -> eyre::Result<()> {
     let signing_key = derive_key(mnemonic, "", coin_type)?;
-    let signer = TxSigner::new(signing_key, Default::default());
+    let signer = TxSigner::new(signing_key, key_type);
 
     // Ensure that we have HRPs for deriving account ids
     let (account_hrp, valoper_hrp) = match (account_hrp, valoper_hrp) {
