@@ -153,7 +153,6 @@ pub async fn get_account_info(
         /* PeriodicVestingAccount::type_url() */
         "/cosmos.vesting.v1beta1.PeriodicVestingAccount" => {
             let account: PeriodicVestingAccount = account.to_msg()?;
-            
 
             account
                 .base_vesting_account
