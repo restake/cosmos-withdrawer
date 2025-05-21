@@ -21,7 +21,11 @@ use crate::{
     AccountArgs, SetupValoperMethod, TransactionArgs,
     chain::get_chain_info,
     cmd::ResolvedAccounts,
-    cosmos_sdk_extra::{gas::GasInfo, simulate::simulate_tx, tx::generate_unsigned_tx_json},
+    cosmos_sdk_extra::{
+        gas::GasInfo,
+        simulate::simulate_tx,
+        tx::{generate_unsigned_tx_json, poll_tx, print_tx_result},
+    },
     ser::{CosmosJsonSerializable, TimestampStr},
     wallet::{SigningAccountType, construct_transaction_body, setup_signer, sign_transaction},
 };
@@ -207,7 +211,9 @@ pub async fn setup_valoper(
         .broadcast_tx_sync(Tx::from(signed_tx).to_bytes()?)
         .await?;
 
-    dbg!(tx_result);
+    print_tx_result(&tx_result);
+    poll_tx(&client, tx_result.hash).await?;
+    info!(tx_hash = ?tx_result.hash, "transaction committed to chain, valoper set up");
 
     Ok(())
 }

@@ -6,6 +6,8 @@ use std::{
 use cosmrs::{
     AccountId,
     proto::cosmos::{
+        bank::v1beta1::MsgSend,
+        base::v1beta1::Coin,
         distribution::v1beta1::{
             MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission,
             QueryDelegationTotalRewardsRequest,
@@ -28,7 +30,7 @@ use crate::{
         gas::GasInfo,
         simulate::simulate_tx,
         str_coin::StrCoin,
-        tx::generate_unsigned_tx_json,
+        tx::{generate_unsigned_tx_json, poll_tx, print_tx_result},
     },
     ser::{CosmosJsonSerializable, MsgExecCustom},
     wallet::{SigningAccountType, construct_transaction_body, setup_signer, sign_transaction},
@@ -149,29 +151,6 @@ pub async fn withdraw(
         authz_msgs.push(MsgWithdrawValidatorCommission { validator_address }.into());
     }
 
-    // if !chain_info.chain_supports_setting_withdrawal_address {
-    //     let withdraw_address = account
-    //         .reward_address
-    //         .as_ref()
-    //         .unwrap_or(&account.controller_address);
-
-    //     let amount = collected_coins
-    //         .into_iter()
-    //         .map(|(denom, amount)| Coin {
-    //             amount: amount.to_string(),
-    //             denom,
-    //         })
-    //         .collect::<Vec<_>>();
-
-    //     authz_msgs.push(
-    //         MsgSend {
-    //             from_address: account.delegator_address.to_string(),
-    //             to_address: withdraw_address.to_string(),
-    //             amount,
-    //         }
-    //         .into(),
-    //     );
-    // }
     if !chain_info.chain_supports_setting_withdrawal_address && transaction_args.generate_only {
         // Due to the way how cosmos transactions work, you cannot stack multiple messages on top of each other - MsgSend won't know about updated balance before
         // the transaction has been committed on the chain. If transaction is executed within the tool, then we can easily wait until withdraw succeeds, and then
@@ -244,7 +223,100 @@ pub async fn withdraw(
         .broadcast_tx_sync(Tx::from(signed_tx).to_bytes()?)
         .await?;
 
-    dbg!(tx_result);
+    print_tx_result(&tx_result);
+    poll_tx(&client, tx_result.hash).await?;
+    info!(tx_hash = ?tx_result.hash, "transaction committed to chain, withdrawal done");
+
+    // Handle AuthzSend scenario
+    if !chain_info.chain_supports_setting_withdrawal_address {
+        debug!("refreshing account data");
+        let ResolvedAccounts {
+            controller_account,
+            controller_key_type,
+            ..
+        } = account.get_account_details(&client, &chain_info).await?;
+
+        let signer = setup_signer(
+            &account,
+            &chain_info.bech32,
+            SigningAccountType::Controller {
+                key_type: controller_key_type,
+                account_number: transaction_args
+                    .account_number
+                    .unwrap_or(controller_account.account_number),
+                sequence: transaction_args
+                    .sequence
+                    // If we have sequence override, increment sequence by 1 here blindly
+                    .map(|seq| seq + 1)
+                    .unwrap_or(controller_account.sequence),
+            },
+            transaction_args.generate_only,
+        )?;
+
+        info!("sending withdrawn tokens");
+
+        let mut authz_msgs: Vec<CosmosJsonSerializable> = Vec::new();
+        let withdraw_address = account
+            .reward_address
+            .as_ref()
+            .unwrap_or(&account.controller_address);
+
+        let amount = collected_coins
+            .into_iter()
+            .map(|(denom, amount)| Coin {
+                amount: amount.to_string(),
+                denom,
+            })
+            .collect::<Vec<_>>();
+
+        debug!(?amount, "tokens to send to reward address");
+
+        authz_msgs.push(
+            MsgSend {
+                from_address: account.delegator_address.to_string(),
+                to_address: withdraw_address.to_string(),
+                amount,
+            }
+            .into(),
+        );
+
+        let msgs = vec![
+            MsgExecCustom {
+                grantee: account.controller_address.to_string(),
+                msgs: authz_msgs,
+            }
+            .into(),
+        ];
+
+        let fee = if let Some(fee) = gas_info.get_fee() {
+            fee
+        } else {
+            simulate_tx(
+                &client,
+                &chain_info,
+                &gas_info,
+                &signer,
+                construct_transaction_body(&transaction_args.memo, &msgs)?,
+            )
+            .await?
+        };
+
+        let signed_tx = sign_transaction(
+            &chain_info,
+            &signer,
+            fee,
+            construct_transaction_body(&transaction_args.memo, &msgs)?,
+        )
+        .wrap_err("failed to sign send transaction")?;
+
+        let tx_result = client
+            .broadcast_tx_sync(Tx::from(signed_tx).to_bytes()?)
+            .await?;
+
+        print_tx_result(&tx_result);
+        poll_tx(&client, tx_result.hash).await?;
+        info!(tx_hash = ?tx_result.hash, "transaction committed to chain, send done");
+    }
 
     Ok(())
 }
