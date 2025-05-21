@@ -3,12 +3,16 @@ use std::str::FromStr;
 
 use clap::{Args, Subcommand};
 use cosmrs::AccountId;
-use eyre::eyre;
+use cosmrs::proto::cosmos::auth::v1beta1::BaseAccount;
+use cosmrs::rpc::HttpClient;
+use eyre::{ContextCompat, eyre};
+use tracing::trace;
 
 mod debug;
 mod setup_valoper;
 mod withdraw;
 
+use crate::chain::get_account_info;
 use crate::wallet::WalletKeyType;
 use crate::{chain::ChainInfo, cosmos_sdk_extra::str_coin::FloatStrCoin};
 
@@ -129,6 +133,55 @@ impl AccountArgs {
 
         Ok(())
     }
+
+    pub async fn get_account_details(
+        &self,
+        client: &HttpClient,
+        chain_info: &ChainInfo,
+    ) -> eyre::Result<ResolvedAccounts> {
+        self.verify_accounts(chain_info)?;
+
+        let (delegator_account, delegator_key_type) =
+            get_account_info(client, &self.delegator_address)
+                .await?
+                .wrap_err("delegator account is not initialized")?;
+
+        let delegator_key_type = delegator_key_type.override_type(self.delegator_address_type);
+
+        trace!(
+            ?delegator_account,
+            ?delegator_key_type,
+            "delegator account info"
+        );
+
+        let (controller_account, controller_key_type) =
+            get_account_info(client, &self.controller_address)
+                .await?
+                .wrap_err("controller account is not initialized")?;
+
+        let controller_key_type = controller_key_type.override_type(self.controller_address_type);
+
+        trace!(
+            ?controller_account,
+            ?controller_key_type,
+            "controller account info"
+        );
+
+        Ok(ResolvedAccounts {
+            delegator_account,
+            delegator_key_type,
+            controller_account,
+            controller_key_type,
+        })
+    }
+}
+
+#[derive(Debug)]
+pub struct ResolvedAccounts {
+    pub delegator_account: BaseAccount,
+    pub delegator_key_type: WalletKeyType,
+    pub controller_account: BaseAccount,
+    pub controller_key_type: WalletKeyType,
 }
 
 #[derive(Debug, Args)]

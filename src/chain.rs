@@ -14,14 +14,17 @@ use cosmrs::{rpc::HttpClient, tendermint::chain::Id};
 use eyre::{Context, ContextCompat, bail};
 use tracing::trace;
 
-use crate::cosmos_sdk_extra::{
-    abci_query::{
-        Bech32Prefix, QueryAccount, QueryDistributionParams, QueryValidatorCommission,
-        execute_abci_query,
+use crate::{
+    cosmos_sdk_extra::{
+        abci_query::{
+            Bech32Prefix, QueryAccount, QueryDistributionParams, QueryValidatorCommission,
+            execute_abci_query,
+        },
+        ethermint::EthAccount,
+        injective::EthAccount as InjectiveEthAccount,
+        rpc::get_status,
     },
-    ethermint::EthAccount,
-    injective::EthAccount as InjectiveEthAccount,
-    rpc::get_status,
+    wallet::WalletKeyType,
 };
 
 pub struct Bech32Prefixes {
@@ -124,7 +127,7 @@ pub async fn get_chain_info(
 pub async fn get_account_info(
     client: &HttpClient,
     account_id: &AccountId,
-) -> eyre::Result<Option<BaseAccount>> {
+) -> eyre::Result<Option<(BaseAccount, WalletKeyType)>> {
     let account = execute_abci_query::<QueryAccount>(
         client,
         QueryAccountRequest {
@@ -172,7 +175,12 @@ pub async fn get_account_info(
         type_url => bail!("unsupported account type '{type_url}'"),
     };
 
-    Ok(Some(base_account))
+    let Some(pub_key) = base_account.pub_key.as_ref() else {
+        bail!("account does not have public key information");
+    };
+
+    let wallet_key_type = WalletKeyType::try_from(pub_key)?;
+    Ok(Some((base_account, wallet_key_type)))
 }
 
 pub async fn get_validator_commission(

@@ -42,6 +42,31 @@ impl WalletKeyType {
             Self::EthermintSecp256k1 { .. } => "eth_secp256k1",
         }
     }
+
+    pub fn override_type(self, other: Option<Self>) -> Self {
+        match (other, self) {
+            // No override, use detected keypair type
+            (None, v) => v,
+            // If user prefers secp256k1, respect that
+            (Some(v @ Self::Secp256k1), _) => v,
+            // If user prefers eth_secp256k1 over secp256k1, respect that
+            (Some(v @ Self::EthermintSecp256k1 { .. }), Self::Secp256k1) => v,
+            // Remaining case
+            (
+                Some(a @ Self::EthermintSecp256k1 { injective: ask_inj }),
+                b @ Self::EthermintSecp256k1 { injective: is_inj },
+            ) => {
+                if ask_inj {
+                    // This case is impossible, user cannot specify eth_secp256k1 with injective hint
+                    unreachable!();
+                }
+
+                // If user specified eth_secp256k1, then that hint most likely does not have Injective field set,
+                // therefore convert key transparently.
+                if is_inj { b } else { a }
+            }
+        }
+    }
 }
 
 impl FromStr for WalletKeyType {

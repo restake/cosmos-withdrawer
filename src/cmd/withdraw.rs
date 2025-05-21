@@ -15,13 +15,14 @@ use cosmrs::{
     rpc::{Client, HttpClient},
     tx::MessageExt,
 };
-use eyre::{Context, ContextCompat};
+use eyre::Context;
 use num_bigint::BigUint;
 use tracing::{debug, info, trace, warn};
 
 use crate::{
     AccountArgs, TransactionArgs,
-    chain::{get_account_info, get_chain_info, get_validator_commission},
+    chain::{get_chain_info, get_validator_commission},
+    cmd::ResolvedAccounts,
     cosmos_sdk_extra::{
         abci_query::{QueryDelegationTotalRewards, execute_abci_query},
         gas::GasInfo,
@@ -30,10 +31,7 @@ use crate::{
         tx::generate_unsigned_tx_json,
     },
     ser::{CosmosJsonSerializable, MsgExecCustom},
-    wallet::{
-        SigningAccountType, WalletKeyType, construct_transaction_body, setup_signer,
-        sign_transaction,
-    },
+    wallet::{SigningAccountType, construct_transaction_body, setup_signer, sign_transaction},
 };
 
 pub async fn withdraw(
@@ -50,45 +48,13 @@ pub async fn withdraw(
 
     info!(?chain_info, ?gas_info.denom, ?gas_info.price, "chain info");
 
-    account.verify_accounts(&chain_info)?;
-
     // Ensure delegator & controller accounts are initialized
     // Withdrawal address does not need to be initialized, as it'll only receive rewards
-    let delegator_account = get_account_info(&client, &account.delegator_address)
-        .await?
-        .wrap_err("delegator account is not initialized")?;
-
-    let delegator_key_type: WalletKeyType = account
-        .delegator_address_type
-        .or(delegator_account
-            .pub_key
-            .as_ref()
-            .and_then(|pub_key| pub_key.try_into().ok()))
-        .wrap_err("unable to determine delegator account public key type")?;
-
-    trace!(
-        ?delegator_account,
-        ?delegator_key_type,
-        "delegator account info"
-    );
-
-    let controller_account = get_account_info(&client, &account.controller_address)
-        .await?
-        .wrap_err("controller account is not initialized")?;
-
-    let controller_key_type: WalletKeyType = account
-        .controller_address_type
-        .or(controller_account
-            .pub_key
-            .as_ref()
-            .and_then(|pub_key| pub_key.try_into().ok()))
-        .wrap_err("unable to determine controller account public key type")?;
-
-    trace!(
-        ?controller_account,
-        ?controller_key_type,
-        "controller account info"
-    );
+    let ResolvedAccounts {
+        controller_account,
+        controller_key_type,
+        ..
+    } = account.get_account_details(&client, &chain_info).await?;
 
     let delegation_total_rewards = execute_abci_query::<QueryDelegationTotalRewards>(
         &client,

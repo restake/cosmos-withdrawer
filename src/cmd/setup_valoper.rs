@@ -14,18 +14,16 @@ use cosmrs::{
     rpc::{Client, HttpClient},
     tx::MessageExt,
 };
-use eyre::{Context, ContextCompat, eyre};
-use tracing::{info, trace, warn};
+use eyre::{Context, eyre};
+use tracing::{info, warn};
 
 use crate::{
     AccountArgs, SetupValoperMethod, TransactionArgs,
-    chain::{get_account_info, get_chain_info},
+    chain::get_chain_info,
+    cmd::ResolvedAccounts,
     cosmos_sdk_extra::{gas::GasInfo, simulate::simulate_tx, tx::generate_unsigned_tx_json},
     ser::{CosmosJsonSerializable, TimestampStr},
-    wallet::{
-        SigningAccountType, WalletKeyType, construct_transaction_body, setup_signer,
-        sign_transaction,
-    },
+    wallet::{SigningAccountType, construct_transaction_body, setup_signer, sign_transaction},
 };
 
 pub async fn setup_valoper(
@@ -42,8 +40,6 @@ pub async fn setup_valoper(
     let gas_info = GasInfo::determine_gas(&chain_info, &transaction_args)?;
 
     info!(?chain_info, ?gas_info.denom, ?gas_info.price, "chain info");
-
-    account.verify_accounts(&chain_info)?;
 
     // Determine setup method
     let setup_method = match (method, chain_info.chain_supports_setting_withdrawal_address) {
@@ -70,41 +66,11 @@ pub async fn setup_valoper(
 
     // Ensure delegator & controller accounts are initialized
     // Withdrawal address does not need to be initialized, as it'll only receive rewards
-    let delegator_account = get_account_info(&client, &account.delegator_address)
-        .await?
-        .wrap_err("delegator account is not initialized")?;
-
-    let delegator_key_type: WalletKeyType = account
-        .delegator_address_type
-        .or(delegator_account
-            .pub_key
-            .as_ref()
-            .and_then(|pub_key| pub_key.try_into().ok()))
-        .wrap_err("unable to determine delegator account public key type")?;
-
-    trace!(
-        ?delegator_account,
-        ?delegator_key_type,
-        "delegator account info"
-    );
-
-    let controller_account = get_account_info(&client, &account.controller_address)
-        .await?
-        .wrap_err("controller account is not initialized")?;
-
-    let controller_key_type: WalletKeyType = account
-        .controller_address_type
-        .or(controller_account
-            .pub_key
-            .as_ref()
-            .and_then(|pub_key| pub_key.try_into().ok()))
-        .wrap_err("unable to determine controller account public key type")?;
-
-    trace!(
-        ?controller_account,
-        ?controller_key_type,
-        "controller account info"
-    );
+    let ResolvedAccounts {
+        delegator_account,
+        delegator_key_type,
+        ..
+    } = account.get_account_details(&client, &chain_info).await?;
 
     let mut msgs: Vec<CosmosJsonSerializable> = Vec::new();
     info!(?setup_method, "setting up valoper account grants");
