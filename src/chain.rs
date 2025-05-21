@@ -127,7 +127,7 @@ pub async fn get_chain_info(
 pub async fn get_account_info(
     client: &HttpClient,
     account_id: &AccountId,
-) -> eyre::Result<Option<(BaseAccount, WalletKeyType)>> {
+) -> eyre::Result<Option<(BaseAccount, Option<WalletKeyType>)>> {
     let account = execute_abci_query::<QueryAccount>(
         client,
         QueryAccountRequest {
@@ -175,11 +175,12 @@ pub async fn get_account_info(
         type_url => bail!("unsupported account type '{type_url}'"),
     };
 
-    let Some(pub_key) = base_account.pub_key.as_ref() else {
-        bail!("account does not have public key information");
+    let wallet_key_type = if let Some(pub_key) = base_account.pub_key.as_ref() {
+        Some(WalletKeyType::try_from(pub_key)?)
+    } else {
+        None
     };
 
-    let wallet_key_type = WalletKeyType::try_from(pub_key)?;
     Ok(Some((base_account, wallet_key_type)))
 }
 

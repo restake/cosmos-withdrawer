@@ -146,7 +146,9 @@ impl AccountArgs {
                 .await?
                 .wrap_err("delegator account is not initialized")?;
 
-        let delegator_key_type = delegator_key_type.override_type(self.delegator_address_type);
+        let delegator_key_type = delegator_key_type
+            .wrap_err("delegation account does not have public key information")?
+            .override_type(self.delegator_address_type);
 
         trace!(
             ?delegator_account,
@@ -159,7 +161,11 @@ impl AccountArgs {
                 .await?
                 .wrap_err("controller account is not initialized")?;
 
-        let controller_key_type = controller_key_type.override_type(self.controller_address_type);
+        // Allow controller account public key to be missing, assume it's the same type
+        // as delegator account public key by default
+        let controller_key_type = controller_key_type
+            .unwrap_or(delegator_key_type)
+            .override_type(self.controller_address_type);
 
         trace!(
             ?controller_account,
