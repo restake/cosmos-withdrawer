@@ -38,12 +38,20 @@ pub fn generate_unsigned_tx_json(
     })
 }
 
-pub fn print_tx_result(result: &cosmrs::rpc::endpoint::broadcast::tx_sync::Response) {
+pub fn print_tx_result(
+    result: &cosmrs::rpc::endpoint::broadcast::tx_sync::Response,
+) -> eyre::Result<()> {
     eprintln!("codespace: {:?}", result.codespace);
     eprintln!("code: {:?}", result.code);
     eprintln!("data: {:?}", result.data);
     eprintln!("log: {:?}", result.log);
-    eprintln!("hash: {:?}", result.hash)
+    eprintln!("hash: {:?}", result.hash);
+
+    if result.code.is_err() {
+        bail!("transaction failed");
+    }
+
+    Ok(())
 }
 
 pub async fn poll_tx(client: &HttpClient, tx_hash: Hash) -> eyre::Result<Tx> {

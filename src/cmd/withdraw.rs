@@ -223,7 +223,7 @@ pub async fn withdraw(
         .broadcast_tx_sync(Tx::from(signed_tx).to_bytes()?)
         .await?;
 
-    print_tx_result(&tx_result);
+    print_tx_result(&tx_result)?;
     poll_tx(&client, tx_result.hash).await?;
     info!(tx_hash = ?tx_result.hash, "transaction committed to chain, withdrawal done");
 
@@ -313,7 +313,7 @@ pub async fn withdraw(
             .broadcast_tx_sync(Tx::from(signed_tx).to_bytes()?)
             .await?;
 
-        print_tx_result(&tx_result);
+        print_tx_result(&tx_result)?;
         poll_tx(&client, tx_result.hash).await?;
         info!(tx_hash = ?tx_result.hash, "transaction committed to chain, send done");
     }
