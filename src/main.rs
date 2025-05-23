@@ -57,7 +57,7 @@ enum Subcommands {
         #[command(subcommand)]
         method: SetupValoperMethod,
 
-        /// Authz grant expiration. By default grants never expire, however some older Cosmos SDK based chains require expiration to be set.
+        /// Authz grant expiration. Either RFC3339 timestamp, or duration string (relative from now). By default grants never expire, however some older Cosmos SDK based chains require expiration to be set.
         #[arg(long)]
         expiration: Option<TimestampStr>,
     },

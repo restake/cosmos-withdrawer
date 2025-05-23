@@ -1,4 +1,4 @@
-use std::{ops::Deref, str::FromStr};
+use std::{ops::Deref, str::FromStr, time::Duration};
 
 use cosmrs::{
     Any,
@@ -14,9 +14,10 @@ use cosmrs::{
         prost::{EncodeError, Name},
     },
 };
+use duration_string::DurationString;
 use eyre::bail;
 use serde_json::{Value, json};
-use time::{OffsetDateTime, format_description::well_known::Rfc3339, macros::offset};
+use time::{OffsetDateTime, UtcDateTime, format_description::well_known::Rfc3339, macros::offset};
 
 pub trait ToCosmosJson {
     fn to_value(&self) -> Value;
@@ -230,6 +231,15 @@ impl FromStr for TimestampStr {
     type Err = eyre::ErrReport;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Ok(duration) = DurationString::from_str(s) {
+            let now = UtcDateTime::now();
+            let expiration = now + Duration::from(duration);
+            return Ok(Self(Timestamp {
+                seconds: expiration.unix_timestamp(),
+                nanos: expiration.nanosecond() as i32,
+            }));
+        }
+
         let t = OffsetDateTime::parse(s, &Rfc3339)?;
         let t = t.to_offset(offset!(UTC));
         if !matches!(t.year(), 1..=9999) {

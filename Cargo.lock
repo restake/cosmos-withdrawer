@@ -332,6 +332,7 @@ dependencies = [
  "clap",
  "cosmrs",
  "digest 0.10.7",
+ "duration-string",
  "eyre",
  "num-bigint",
  "paste",
@@ -468,6 +469,12 @@ dependencies = [
  "quote",
  "syn",
 ]
+
+[[package]]
+name = "duration-string"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "04782251e09dc67c90d694d89e9a3e5fc6cfe883df1b203202de672d812fb299"
 
 [[package]]
 name = "ecdsa"
